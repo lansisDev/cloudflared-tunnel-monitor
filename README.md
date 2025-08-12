@@ -1,11 +1,12 @@
 # Cloudflare Tunnel Monitor
 
-Una aplicación TypeScript/Node.js que monitorea el estado de tu túnel de Cloudflare cada 5 minutos y envía notificaciones a Telegram cuando el túnel no está disponible.
+Una aplicación TypeScript/Node.js que monitorea el estado de uno o múltiples túneles de Cloudflare cada 5 minutos y envía notificaciones a Telegram cuando algún túnel no está disponible.
 
 ## 🚀 Características
 
-- ⏰ **Monitoreo automático**: Verifica el estado del túnel cada 5 minutos (configurable)
-- 📱 **Notificaciones Telegram**: Alertas inmediatas cuando el túnel se cae o se recupera
+- ⏰ **Monitoreo automático**: Verifica el estado de los túneles cada 5 minutos (configurable)
+- � **Múltiples túneles**: Monitorea varios túneles simultáneamente
+- �📱 **Notificaciones Telegram**: Alertas inmediatas cuando un túnel se cae o se recupera
 - 📊 **Logging detallado**: Registro completo de todas las verificaciones y eventos
 - 🔧 **Altamente configurable**: Personaliza URLs, intervalos y timeouts
 - 🛡️ **Robusto**: Manejo de errores y reintentos automáticos
@@ -15,7 +16,7 @@ Una aplicación TypeScript/Node.js que monitorea el estado de tu túnel de Cloud
 - Node.js 18+ 
 - npm o yarn
 - Un bot de Telegram configurado
-- Túnel de Cloudflare activo
+- Túnel(es) de Cloudflare activo(s)
 
 ## 🛠️ Instalación
 
@@ -36,6 +37,23 @@ Una aplicación TypeScript/Node.js que monitorea el estado de tu túnel de Cloud
    ```
 
 4. **Edita el archivo `.env`** con tus datos:
+
+### Configuración para múltiples túneles (recomendado):
+   ```env
+   # Múltiples túneles en formato JSON
+   TUNNELS=[
+     {"name":"Dokploy VPS 1","url":"https://dokploy-vps-1.lansis.com.ar/"},
+     {"name":"App Production","url":"https://app.midominio.com/"},
+     {"name":"API Server","url":"https://api.midominio.com/"}
+   ]
+   
+   TELEGRAM_BOT_TOKEN=tu_bot_token_aqui
+   TELEGRAM_CHAT_ID=tu_chat_id_aqui
+   CHECK_INTERVAL_MINUTES=5
+   TIMEOUT_MS=10000
+   ```
+
+### Configuración para un solo túnel (compatibilidad):
    ```env
    TUNNEL_URL=https://tu-tunnel-url.trycloudflare.com
    TELEGRAM_BOT_TOKEN=tu_bot_token_aqui
@@ -99,11 +117,34 @@ src/
 
 | Variable | Descripción | Requerido | Ejemplo |
 |----------|-------------|-----------|---------|
-| `TUNNEL_URL` | URL de tu túnel de Cloudflare | ✅ | `https://mi-app.trycloudflare.com` |
+| `TUNNELS` | Array JSON con configuración de túneles | ✅ (o TUNNEL_URL) | `[{"name":"Mi App","url":"https://..."}]` |
+| `TUNNEL_URL` | URL de un túnel (compatibilidad) | ✅ (o TUNNELS) | `https://mi-app.trycloudflare.com` |
 | `TELEGRAM_BOT_TOKEN` | Token de tu bot de Telegram | ✅ | `1234567890:ABCdefGhijKlmnOpQrsTuvWxyz` |
 | `TELEGRAM_CHAT_ID` | ID del chat donde enviar notificaciones | ✅ | `123456789` |
 | `CHECK_INTERVAL_MINUTES` | Intervalo de verificación en minutos | ❌ | `5` (default) |
 | `TIMEOUT_MS` | Timeout para requests HTTP en milisegundos | ❌ | `10000` (default) |
+
+### Formato de TUNNELS
+
+La variable `TUNNELS` debe ser un array JSON válido:
+
+```json
+[
+  {
+    "name": "Nombre descriptivo del túnel",
+    "url": "https://url-completa-del-tunel.com/"
+  },
+  {
+    "name": "Otro túnel",
+    "url": "https://otro-tunel.ejemplo.com/"
+  }
+]
+```
+
+**Importante**: 
+- Si defines `TUNNELS`, se ignorará `TUNNEL_URL`
+- Si no defines `TUNNELS`, se usará `TUNNEL_URL` para compatibilidad
+- Cada túnel debe tener un `name` único y una `url` válida
 
 ## 🔧 Personalización
 

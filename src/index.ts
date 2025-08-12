@@ -2,23 +2,26 @@ import * as cron from 'node-cron';
 import { config, validateConfig } from './config';
 import { TunnelMonitor } from './tunnel-monitor';
 import { TelegramNotifier } from './telegram-notifier';
+import { TunnelStatus } from './types';
 import logger from './logger';
 
 class TunnelMonitorApp {
-  private monitor: TunnelMonitor;
+  private monitors: TunnelMonitor[] = [];
   private notifier: TelegramNotifier;
-  private lastStatus: boolean | null = null;
+  private lastStatuses: Map<string, boolean> = new Map();
   private isRunning = false;
   private cronTask: cron.ScheduledTask | null = null;
 
   constructor() {
     validateConfig(config);
     
-    this.monitor = new TunnelMonitor(config.tunnelUrl, config.timeoutMs);
+    this.monitors = config.tunnels.map(tunnel => 
+      new TunnelMonitor(tunnel, config.timeoutMs)
+    );
     this.notifier = new TelegramNotifier(config.telegramBotToken);
   }
 
-  async checkTunnel(): Promise<void> {
+  async checkTunnels(): Promise<void> {
     if (this.isRunning) {
       logger.warn('Previous check still running, skipping...');
       return;
@@ -27,56 +30,78 @@ class TunnelMonitorApp {
     this.isRunning = true;
 
     try {
-      const status = await this.monitor.checkStatus();
-      
-      // Check if status changed
-      if (this.lastStatus !== null && this.lastStatus !== status.isOnline) {
-        if (status.isOnline) {
-          // Tunnel recovered
-          await this.notifier.sendTunnelRecoveredAlert(
-            config.tunnelUrl,
-            config.telegramChatId,
-            status.responseTime
-          );
+      // Check all tunnels in parallel
+      const statusPromises = this.monitors.map(monitor => monitor.checkStatus());
+      const statuses = await Promise.allSettled(statusPromises);
+
+      for (let i = 0; i < statuses.length; i++) {
+        const result = statuses[i];
+        
+        if (result.status === 'fulfilled') {
+          const status = result.value;
+          await this.handleTunnelStatus(status);
         } else {
-          // Tunnel went down
-          await this.notifier.sendTunnelDownAlert(
-            config.tunnelUrl,
-            config.telegramChatId,
-            status.error
-          );
+          logger.error(`Failed to check tunnel ${config.tunnels[i].name}: ${result.reason}`);
         }
-      }
-
-      this.lastStatus = status.isOnline;
-
-      if (status.isOnline) {
-        logger.info(`✅ Tunnel is online (${status.responseTime}ms)`);
-      } else {
-        logger.error(`❌ Tunnel is offline: ${status.error}`);
       }
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(`Error during tunnel check: ${errorMessage}`);
+      logger.error(`Error during tunnel checks: ${errorMessage}`);
     } finally {
       this.isRunning = false;
     }
   }
 
+  private async handleTunnelStatus(status: TunnelStatus): Promise<void> {
+    const lastStatus = this.lastStatuses.get(status.tunnelName);
+    
+    // Check if status changed
+    if (lastStatus !== undefined && lastStatus !== status.isOnline) {
+      if (status.isOnline) {
+        // Tunnel recovered
+        await this.notifier.sendTunnelRecoveredAlert(
+          status.tunnelName,
+          config.telegramChatId,
+          status.responseTime
+        );
+      } else {
+        // Tunnel went down
+        await this.notifier.sendTunnelDownAlert(
+          status.tunnelName,
+          config.telegramChatId,
+          status.error
+        );
+      }
+    }
+
+    this.lastStatuses.set(status.tunnelName, status.isOnline);
+
+    if (status.isOnline) {
+      logger.info(`✅ ${status.tunnelName} is online (${status.responseTime}ms)`);
+    } else {
+      logger.error(`❌ ${status.tunnelName} is offline: ${status.error}`);
+    }
+  }
+
   start(): void {
     logger.info('🚀 Starting Cloudflare Tunnel Monitor');
-    logger.info(`📍 Monitoring URL: ${config.tunnelUrl}`);
+    logger.info(`📍 Monitoring ${config.tunnels.length} tunnel(s):`);
+    
+    config.tunnels.forEach(tunnel => {
+      logger.info(`   - ${tunnel.name}: ${tunnel.url}`);
+    });
+    
     logger.info(`⏰ Check interval: ${config.checkIntervalMinutes} minutes`);
     logger.info(`💬 Telegram notifications enabled`);
 
     // Run initial check
-    this.checkTunnel();
+    this.checkTunnels();
 
     // Schedule periodic checks
     const cronExpression = `*/${config.checkIntervalMinutes} * * * *`;
     this.cronTask = cron.schedule(cronExpression, () => {
-      this.checkTunnel();
+      this.checkTunnels();
     });
 
     logger.info(`⏰ Scheduled checks every ${config.checkIntervalMinutes} minutes`);

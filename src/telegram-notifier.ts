@@ -36,7 +36,7 @@ export class TelegramNotifier {
     }
   }
 
-  async sendTunnelDownAlert(tunnelUrl: string, chatId: string, error?: string): Promise<boolean> {
+  async sendTunnelDownAlert(tunnelName: string, chatId: string, error?: string): Promise<boolean> {
     const timestamp = new Date().toLocaleString('es-AR', {
       timeZone: 'America/Argentina/Buenos_Aires'
     });
@@ -44,7 +44,7 @@ export class TelegramNotifier {
     const message = `
 🚨 <b>TUNNEL DOWN ALERT</b> 🚨
 
-📍 <b>URL:</b> ${tunnelUrl}
+📍 <b>Tunnel:</b> ${tunnelName}
 ⏰ <b>Time:</b> ${timestamp}
 ${error ? `❌ <b>Error:</b> ${error}` : ''}
 
@@ -57,7 +57,7 @@ The Cloudflare tunnel is currently offline!
     });
   }
 
-  async sendTunnelRecoveredAlert(tunnelUrl: string, chatId: string, responseTime?: number): Promise<boolean> {
+  async sendTunnelRecoveredAlert(tunnelName: string, chatId: string, responseTime?: number): Promise<boolean> {
     const timestamp = new Date().toLocaleString('es-AR', {
       timeZone: 'America/Argentina/Buenos_Aires'
     });
@@ -65,7 +65,7 @@ The Cloudflare tunnel is currently offline!
     const message = `
 ✅ <b>TUNNEL RECOVERED</b> ✅
 
-📍 <b>URL:</b> ${tunnelUrl}
+📍 <b>Tunnel:</b> ${tunnelName}
 ⏰ <b>Time:</b> ${timestamp}
 ${responseTime ? `⚡ <b>Response time:</b> ${responseTime}ms` : ''}
 

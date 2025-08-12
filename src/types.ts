@@ -1,5 +1,10 @@
+export interface TunnelConfig {
+  name: string;
+  url: string;
+}
+
 export interface Config {
-  tunnelUrl: string;
+  tunnels: TunnelConfig[];
   telegramBotToken: string;
   telegramChatId: string;
   checkIntervalMinutes: number;
@@ -7,6 +12,7 @@ export interface Config {
 }
 
 export interface TunnelStatus {
+  tunnelName: string;
   isOnline: boolean;
   responseTime?: number;
   error?: string;
